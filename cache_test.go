@@ -170,3 +170,24 @@ func TestGetPricesFor_ParallelizeCalls(t *testing.T) {
 		t.Error("calls took too long, expected them to take a bit over one second")
 	}
 }
+
+func TestGetPricesFor_ParallelizeCallsReturnsErrorOnServiceError(t *testing.T) {
+	mockService := &mockPriceService{
+		callDelay: time.Second, // each call to external service takes one full second
+		mockResults: map[string]mockResult{
+			"p1": {price: 5, err: nil},
+			"p2": {price: 7, err: nil},
+			"p3": {price: 0, err: fmt.Errorf("some error")},
+		},
+	}
+	cache := NewTransparentCache(mockService, time.Minute)
+	start := time.Now()
+	_, err := cache.GetPricesFor("p1", "p2", "p3")
+	elapsedTime := time.Since(start)
+	if elapsedTime > (1200 * time.Millisecond) {
+		t.Error("calls took too long, expected them to take a bit over one second")
+	}
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+}
