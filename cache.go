@@ -1,8 +1,8 @@
 package sample1
 
 import (
-	"time"
 	"fmt"
+	"time"
 )
 
 // PriceService is a service that we can use to get prices for the items
@@ -17,29 +17,38 @@ type PriceService interface {
 type TransparentCache struct {
 	actualPriceService PriceService
 	maxAge             time.Duration
-	prices             map[string]float64
+	prices             map[string]*PriceItem
+}
+
+// PriceItem is the item stored in the cache with its creation date and its corresponding price.
+type PriceItem struct {
+	dateCreated *time.Time
+	price       float64
 }
 
 func NewTransparentCache(actualPriceService PriceService, maxAge time.Duration) *TransparentCache {
 	return &TransparentCache{
 		actualPriceService: actualPriceService,
 		maxAge:             maxAge,
-		prices:             map[string]float64{},
+		prices:             map[string]*PriceItem{},
 	}
 }
 
 // GetPriceFor gets the price for the item, either from the cache or the actual service if it was not cached or too old
 func (c *TransparentCache) GetPriceFor(itemCode string) (float64, error) {
-	price, ok := c.prices[itemCode]
+	priceItem, ok := c.prices[itemCode]
 	if ok {
-		// TODO: check that the price was retrieved less than "maxAge" ago!
-		return price, nil
+		if time.Now().Before(priceItem.dateCreated.Add(c.maxAge)) {
+			return priceItem.price, nil
+		}
 	}
 	price, err := c.actualPriceService.GetPriceFor(itemCode)
 	if err != nil {
 		return 0, fmt.Errorf("getting price from service : %v", err.Error())
 	}
-	c.prices[itemCode] = price
+	dateCreated := time.Now()
+	priceItem = &PriceItem{dateCreated: &dateCreated, price: price}
+	c.prices[itemCode] = priceItem
 	return price, nil
 }
 
