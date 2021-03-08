@@ -1,6 +1,7 @@
 package sample1
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -78,6 +79,8 @@ func (c *TransparentCache) GetPricesFor(itemCodes ...string) ([]float64, error) 
 			results = append(results, price)
 		case err := <-errChan:
 			return []float64{}, err
+		case <-time.After(2 * time.Second):
+			return []float64{}, errors.New("Timeout error getting prices for")
 		}
 	}
 

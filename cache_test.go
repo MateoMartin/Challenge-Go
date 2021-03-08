@@ -191,3 +191,19 @@ func TestGetPricesFor_ParallelizeCallsReturnsErrorOnServiceError(t *testing.T) {
 		t.Errorf("expected error, got nil")
 	}
 }
+
+func TestGetPricesFor_ParallelizeCallsReturnsErrorOnTimeout(t *testing.T) {
+	mockService := &mockPriceService{
+		callDelay: 2 * time.Second, // each call to external service takes two full second
+		mockResults: map[string]mockResult{
+			"p1": {price: 5, err: nil},
+			"p2": {price: 7, err: nil},
+			"p3": {price: 7, err: nil},
+		},
+	}
+	cache := NewTransparentCache(mockService, time.Minute)
+	_, err := cache.GetPricesFor("p1", "p2", "p3")
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+}
