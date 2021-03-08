@@ -2,6 +2,7 @@ package sample1
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type TransparentCache struct {
 	actualPriceService PriceService
 	maxAge             time.Duration
 	prices             map[string]*PriceItem
+	mu                 sync.Mutex
 }
 
 // PriceItem is the item stored in the cache with its creation date and its corresponding price.
@@ -48,7 +50,9 @@ func (c *TransparentCache) GetPriceFor(itemCode string) (float64, error) {
 	}
 	dateCreated := time.Now()
 	priceItem = &PriceItem{dateCreated: &dateCreated, price: price}
+	c.mu.Lock()
 	c.prices[itemCode] = priceItem
+	c.mu.Unlock()
 	return price, nil
 }
 
@@ -56,13 +60,26 @@ func (c *TransparentCache) GetPriceFor(itemCode string) (float64, error) {
 // If any of the operations returns an error, it should return an error as well
 func (c *TransparentCache) GetPricesFor(itemCodes ...string) ([]float64, error) {
 	results := []float64{}
+	priceChan := make(chan float64, len(itemCodes))
+	errChan := make(chan error)
 	for _, itemCode := range itemCodes {
-		// TODO: parallelize this, it can be optimized to not make the calls to the external service sequentially
-		price, err := c.GetPriceFor(itemCode)
-		if err != nil {
+		go func(itemCode string) {
+			price, err := c.GetPriceFor(itemCode)
+			if err != nil {
+				errChan <- err
+			}
+			priceChan <- price
+		}(itemCode)
+	}
+
+	for i := 0; i < len(itemCodes); i++ {
+		select {
+		case price := <-priceChan:
+			results = append(results, price)
+		case err := <-errChan:
 			return []float64{}, err
 		}
-		results = append(results, price)
 	}
+
 	return results, nil
 }
