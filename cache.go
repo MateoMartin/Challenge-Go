@@ -20,7 +20,7 @@ type TransparentCache struct {
 	actualPriceService PriceService
 	maxAge             time.Duration
 	prices             map[string]*PriceItem
-	mu                 sync.Mutex
+	mu                 *sync.Mutex
 }
 
 // PriceItem is the item stored in the cache with its creation date and its corresponding price.
@@ -34,6 +34,7 @@ func NewTransparentCache(actualPriceService PriceService, maxAge time.Duration) 
 		actualPriceService: actualPriceService,
 		maxAge:             maxAge,
 		prices:             map[string]*PriceItem{},
+		mu:                 &sync.Mutex{},
 	}
 }
 
